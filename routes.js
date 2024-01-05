@@ -17,7 +17,7 @@ router.post('/login', async (req, res) => {
   
       // If the user is not found, return an error
       if (!user) {
-        return res.status(404).json({ error: 'User not found' });
+        return res.status(200).json({success:false, message: 'User not found' });
       }
   
       // Compare the provided password with the hashed password in the database
@@ -25,15 +25,15 @@ router.post('/login', async (req, res) => {
   
       // If passwords don't match, return an error
       if (!passwordMatch) {
-        return res.status(401).json({ error: 'Invalid password' });
+        return res.status(200).json({success:false, message: 'Invalid password'});
       }
   
       // If everything is fine, you can generate a token or set a session, etc.
       // For simplicity, let's just send a success message
-      res.status(200).json({ message: 'Login successful' });
+      res.status(200).json({ success:true, message: 'Login successful', userid: user._id  });
     } catch (error) {
       console.error(error);
-      res.status(500).json({ error: 'Internal Server Error' });
+      res.status(500).json({ success: false, message: 'Internal Server Error' });
     }
   });
 // add a product
@@ -83,7 +83,7 @@ router.post('/addUser', async (req, res) => {
       // Check if the user already exists
       const existingUser = await User.findOne({ email });
       if (existingUser) {
-        return res.status(400).json({ message: 'User already exists' });
+        return res.status(200).json({ success:false, message: 'User already exists' });
       }
   
       // Encrypt the password using bcrypt
@@ -104,12 +104,28 @@ router.post('/addUser', async (req, res) => {
       // Save the user to the database
       await newUser.save();
   
-      return res.status(201).json({ message: 'User added successfully' });
+      return res.status(201).json({success: true, message: 'User added successfully' });
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ message: 'Internal Server Error' });
+      return res.status(500).json({success:false, message: 'Internal Server Error' });
     }
   });
+
+  router.get('/getUser/:id', async(req, res)=>{
+    try{
+      const user = await User.findOne({_id: req.params.id});
+      if(user){
+        res.status(200).json({success:true, message: "User exists", data: user})
+      }else{
+        res.status(200).json({success:false, message: "User not found"})
+      }
+
+    }catch(e){
+      res.status(500).json({success:false, message: e})
+
+    }
+    
+  })
 
 module.exports = router;
   
