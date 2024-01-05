@@ -38,7 +38,6 @@ router.post('/login', async (req, res) => {
   });
 // add a product
 router.post('/add_products', async (req, res) => {
-    console.log(req.body)
     try {
       const {
         name,
