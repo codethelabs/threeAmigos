@@ -66,7 +66,7 @@ router.post('/add_products', async (req, res) => {
         isFeatured,
       });
   
-      const savedProduct = await newProduct.save();
+      const savedProduct = await newProduct.save("ThreeAmigosDB");
   
       res.status(201).json(savedProduct);
     } catch (error) {
