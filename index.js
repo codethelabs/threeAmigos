@@ -1,14 +1,11 @@
 const express = require('express');
-const http = require('http');
 const db = require('./db');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const routes = require('./routes');
 const path = require('path');
-const socketIo = require('socket.io');
 
 const app = express();
-const server = http.createServer(app);
 
 app.use(cors());
 
@@ -24,6 +21,6 @@ app.use('/api', routes);
 
 const PORT = process.env.PORT || 3000;
 
-server.listen(PORT, () => {
+app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });
