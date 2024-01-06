@@ -3,6 +3,23 @@ const router = express.Router();
 const Product = require('./models/product');
 const User = require('./models/users');
 const bcrypt = require('bcryptjs');
+const path = require('path');
+const multer = require('multer');
+
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, './assets/uploads'); // Change the destination folder as needed
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `${file.fieldname}-${Date.now()}${ext}`);
+  },
+});
+
+const upload = multer({ storage });
+
+
 
 router.get('/', (req, res) => {
     res.send('Welcome to the home page');
@@ -35,42 +52,28 @@ router.post('/login', async (req, res) => {
       console.error(error);
       res.status(500).json({ success: false, message: 'Internal Server Error' });
     }
-  });
+});
 // add a product
-router.post('/add_products', async (req, res) => {
+router.post('/addProduct', upload.single('productpic'), async (req, res) => {
     try {
-      const {
-        name,
-        description,
-        price,
-        category,
-        brand,
-        stockQuantity,
-        ratings,
-        reviews,
-        images,
-        isFeatured,
-      } = req.body;
-  
+
+      const imagePath = req.file.path;      
       const newProduct = new Product({
-        name,
-        description,
-        price,
-        category,
-        brand,
-        stockQuantity,
-        ratings,
-        reviews,
-        images,
-        isFeatured,
+        name: req.body.productname,
+        description: req.body.description,
+        price: req.body.price,
+        category: req.body.category,
+        brand: req.body.brand,
+        stockQuantity: req.body.quantity,      
+        images: [imagePath],
       });
   
-      const savedProduct = await newProduct.save("ThreeAmigosDB");
+      const savedProduct = await newProduct.save();
   
-      res.status(201).json(savedProduct);
+      res.status(200).json({success:true,message:"Product added successfully"});
     } catch (error) {
       console.error(error);
-      res.status(500).json({ error: 'Internal Server Error' });
+      res.status(201).json({success:false,message:"Server Error"});
     }
   });
 
