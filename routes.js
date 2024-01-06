@@ -9,7 +9,7 @@ const { BlobServiceClient, StorageSharedKeyCredential } = require("@azure/storag
 const { rmSync } = require('fs');
 
 const azure_storage_account = "3acsimagestorage"
-const azure_storage_account_key = "fDnQnQKkkFFocMOyXGO40ehFSPMiXpc6P2mcMMwbHS8T5anQsyIRCCy2osZ03C03NVwU4Hs3sRZ8+AStFjxPSg==";
+const azure_storage_account_key = "IgeI3y8i8SdWvjW1zUpbkwU3W7tfaTmSSDRfCeji01gmeIm8+Th9jL74RZ4kI/m+wJ0Lh/iFmXJI+ASt1QoVHQ==";
 const azure_storage_account_sharedKeyCredential = new StorageSharedKeyCredential(azure_storage_account, azure_storage_account_key);
 
 const blobServiceClient = new BlobServiceClient(
