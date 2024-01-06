@@ -6,7 +6,7 @@ const bcrypt = require('bcryptjs');
 const path = require('path');
 const multer = require('multer');
 const { BlobServiceClient, StorageSharedKeyCredential } = require("@azure/storage-blob");
-const { rmSync } = require('fs');
+const fs = require('fs');
 
 const azure_storage_account = "3acsimagestorage"
 const azure_storage_account_key = "IgeI3y8i8SdWvjW1zUpbkwU3W7tfaTmSSDRfCeji01gmeIm8+Th9jL74RZ4kI/m+wJ0Lh/iFmXJI+ASt1QoVHQ==";
@@ -90,7 +90,7 @@ router.post('/addProduct', upload.single('productpic'), async (req, res) => {
     });
 
     // Delete the local image file
-    // fs.unlinkSync(imagePath);
+    fs.unlinkSync(imagePath);
 
     const newProduct = new Product({
       name: req.body.productname,
