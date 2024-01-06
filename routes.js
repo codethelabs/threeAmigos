@@ -120,16 +120,32 @@ router.post('/addProduct', upload.single('productpic'), async (req, res) => {
 
 
 // get all the products
-router.get('/getAllProducts', async (req, res)=>{
-  try{
+router.get('/getAllProducts', async (req, res) => {
+  try {
+    // Get all products
+    const allProducts = await Product.find();
 
-    const products = await Product.find();
-    res.status(200).json({success:true, data: products})
+    // Create an array to store unique product identifiers (e.g., name and brand)
+    const uniqueIdentifiers = [];
 
-  }catch(e){
-    res.status(500).json({success:false, messasge: e})
+    // Filter the products to include only the first instance for each unique product
+    const uniqueProducts = allProducts.filter(product => {
+      const identifier = `${product.name}-${product.brand}`;
+      if (!uniqueIdentifiers.includes(identifier)) {
+        uniqueIdentifiers.push(identifier);
+        return true;
+      }
+      return false;
+    });
+
+    res.status(200).json({ success: true, data: uniqueProducts });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e });
   }
-})
+});
+
+
+
 
 
 
