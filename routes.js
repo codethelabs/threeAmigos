@@ -202,5 +202,21 @@ router.post('/addUser', async (req, res) => {
     
   })
 
+  router.get('/getProductDetails/:id', async(req, res)=>{
+    try{
+      const product = await Product.findOne({_id: req.params.id});
+      if(product){
+        res.status(200).json({success:true, message: "Product exists", data: product})
+      }else{
+        res.status(200).json({success:false, message: "Product not found"})
+      }
+
+    }catch(e){
+      res.status(500).json({success:false, message: e})
+
+    }
+    
+  })
+
 module.exports = router;
   
