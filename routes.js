@@ -5,6 +5,17 @@ const User = require('./models/users');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const multer = require('multer');
+const { BlobServiceClient, StorageSharedKeyCredential } = require("@azure/storage-blob");
+
+const azure_storage_account = "3acsimagestorage"
+const azure_storage_account_key = "fDnQnQKkkFFocMOyXGO40ehFSPMiXpc6P2mcMMwbHS8T5anQsyIRCCy2osZ03C03NVwU4Hs3sRZ8+AStFjxPSg==";
+const azure_storage_account_sharedKeyCredential = new StorageSharedKeyCredential(azure_storage_account, azure_storage_account_key);
+
+const blobServiceClient = new BlobServiceClient(
+  `https://${azure_storage_account}.blob.core.windows.net`,
+  azure_storage_account_sharedKeyCredential
+);
+const containerClient = blobServiceClient.getContainerClient("products");
 
 
 const storage = multer.diskStorage({
@@ -16,6 +27,7 @@ const storage = multer.diskStorage({
     cb(null, `${file.fieldname}-${Date.now()}${ext}`);
   },
 });
+// const storage = multer.memoryStorage();
 
 const upload = multer({ storage });
 
@@ -55,27 +67,50 @@ router.post('/login', async (req, res) => {
 });
 // add a product
 router.post('/addProduct', upload.single('productpic'), async (req, res) => {
-    try {
+  try {
+    const imagePath = req.file.path;
 
-      const imagePath = req.file.path;      
-      const newProduct = new Product({
-        name: req.body.productname,
-        description: req.body.description,
-        price: req.body.price,
-        category: req.body.category,
-        brand: req.body.brand,
-        stockQuantity: req.body.quantity,      
-        images: [imagePath],
-      });
-  
-      const savedProduct = await newProduct.save();
-  
-      res.status(200).json({success:true,message:"Product added successfully"});
-    } catch (error) {
-      console.error(error);
-      res.status(201).json({success:false,message:"Server Error"});
+    // Upload image to Azure Storage Blob
+    const blobName = path.basename(imagePath);
+    const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+
+    // Ensure that the blockBlobClient is successfully created
+    if (!blockBlobClient) {
+      return res.status(500).json({ success: false, message: 'Error creating BlockBlobClient' });
     }
-  });
+
+    await blockBlobClient.uploadFile(imagePath);
+
+    // Generate a SAS token for the image
+    const sasToken = await blockBlobClient.generateSasUrl({
+      permissions: 'r', // 'READ' permission
+      startsOn: new Date(),
+      expiresOn: new Date(new Date().valueOf() + 86400), // Expires in 24 hours
+    });
+
+    // Delete the local image file
+    // fs.unlinkSync(imagePath);
+
+    const newProduct = new Product({
+      name: req.body.productname,
+      description: req.body.description,
+      price: req.body.price,
+      category: req.body.category,
+      brand: req.body.brand,
+      stockQuantity: req.body.quantity,
+      images: [sasToken],
+    });
+
+    const savedProduct = await newProduct.save();
+
+    res.status(200).json({ success: true, message: "Product added successfully", data: savedProduct });
+  } catch (error) {
+    console.error(error);
+    res.status(201).json({ success: false, message: "Server Error" });
+  }
+});
+
+
 
   // Route to add a new user
 router.post('/addUser', async (req, res) => {
