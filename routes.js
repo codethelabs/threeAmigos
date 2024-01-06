@@ -85,7 +85,7 @@ router.post('/addProduct', upload.single('productpic'), async (req, res) => {
     const sasToken = await blockBlobClient.generateSasUrl({
       permissions: 'r', // 'READ' permission
       startsOn: new Date(),
-      expiresOn: new Date(new Date().valueOf() + 86400), // Expires in 24 hours
+      expiresOn: new Date(new Date().valueOf() + 1314000), // Expires in 24 hours
     });
 
     // Delete the local image file
@@ -99,6 +99,7 @@ router.post('/addProduct', upload.single('productpic'), async (req, res) => {
       brand: req.body.brand,
       stockQuantity: req.body.quantity,
       images: [sasToken],
+      supplier: req.body.supplier
     });
 
     const savedProduct = await newProduct.save();
