@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const path = require('path');
 const multer = require('multer');
 const { BlobServiceClient, StorageSharedKeyCredential } = require("@azure/storage-blob");
+const { rmSync } = require('fs');
 
 const azure_storage_account = "3acsimagestorage"
 const azure_storage_account_key = "fDnQnQKkkFFocMOyXGO40ehFSPMiXpc6P2mcMMwbHS8T5anQsyIRCCy2osZ03C03NVwU4Hs3sRZ8+AStFjxPSg==";
@@ -110,6 +111,18 @@ router.post('/addProduct', upload.single('productpic'), async (req, res) => {
     res.status(201).json({ success: false, message: "Server Error" });
   }
 });
+
+// get all the products
+router.get('/getAllProducts', async (req, res)=>{
+  try{
+
+    const products = await Product.find();
+    res.status(200).json({success:true, data: products})
+
+  }catch(e){
+    res.status(500).json({success:false, messasge: e})
+  }
+})
 
 
 
