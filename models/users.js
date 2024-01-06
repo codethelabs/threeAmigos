@@ -9,7 +9,8 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   supplier: { type: Boolean, required: true},
-  staff: {type:Boolean, required: true}
+  staff: {type:Boolean, required: true},
+  balance: {type: Number, default: 0.0}
 });
 
 const User = mongoose.model('User', userSchema);

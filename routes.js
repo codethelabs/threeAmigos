@@ -202,6 +202,36 @@ router.post('/addUser', async (req, res) => {
     
   })
 
+  router.post('/addFunds', async (req, res) => {
+    try {
+      const { userid, amount } = req.body;
+  
+      // Check if the user exists
+      const user = await User.findById(userid);
+  
+      if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+      }
+  
+      // Check if the user has a balance field
+      if (user.balance) {
+        // If the user has a balance, add the amount to it
+        user.balance += parseFloat(amount);
+      } else {
+        // If the user doesn't have a balance, create a new field
+        user.balance = parseFloat(amount);
+      }
+  
+      // Save the updated user
+      const updatedUser = await user.save();
+  
+      res.status(200).json({ success: true, message: 'Funds added successfully', data: updatedUser });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ success: false, message: 'Internal Server Error' });
+    }
+  });
+
   router.get('/getProductDetails/:id', async(req, res)=>{
     try{
       const product = await Product.findOne({_id: req.params.id});
@@ -217,6 +247,8 @@ router.post('/addUser', async (req, res) => {
     }
     
   })
+
+
 
 module.exports = router;
   
