@@ -168,6 +168,67 @@ router.get('/getAllProducts', async (req, res) => {
     res.status(500).json({ success: false, message: e });
   }
 });
+// get cart items
+router.get('/getUserCartItems/:id', async(req, res)=>{
+  try{
+    const id = req.params.id;
+    const items = await Cart.find({userId: id});
+    if(!items){
+      return res.status(200).json({success: false, message: "No Items in Cart"})
+    }
+
+    res.status(200).json({success:true, data: items})
+
+  }catch(e){
+    res.status(500).json({success:false, message: "Server Error"})
+  }
+})
+// get all the transactions
+router.get('/getUserTransactions/:id', async(req, res)=>{
+    try{
+      const id = req.params.id
+      const transactions = await Transaction.find({userId: id});
+      if(!transactions){
+        res.status(200).send({success: false, messasge: "No Transactions Found"})
+      }
+
+      res.status(200).send({success:true, message: "Transactions found", data:transactions})
+      
+    }catch(e){
+      console.log(e)
+      res.status(200).send({success: false, messasge: "Some error occured"})
+    }
+})
+// update user details
+router.put('/updateUser/:id', async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { firstname, lastname, address, phone } = req.body;
+
+    // Find the user by ID
+    const user = await User.findById(userId);
+
+    // If the user doesn't exist, return an error
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Update user details based on provided data (retain current data if new data is null or empty)
+    user.firstname = firstname !== null && firstname !== '' ? firstname : user.firstname;
+    user.lastname = lastname !== null && lastname !== '' ? lastname : user.lastname;
+    user.address = address !== null && address !== '' ? address : user.address;
+    user.phone = phone !== null && phone !== '' ? phone : user.phone;
+
+    // Save the updated user details
+    const updatedUser = await user.save();
+
+    res.status(200).json({ success: true, message: 'User details updated', data: updatedUser });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+});
+
 
   // Route to add a new user
 router.post('/addUser', async (req, res) => {

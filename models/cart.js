@@ -6,6 +6,7 @@ const cartSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
+  status: {type: String, default:"Pending"},
   date: {
     type: Date,
     default: Date.now,
