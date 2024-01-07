@@ -5,6 +5,7 @@ const productSchema = new mongoose.Schema({
   supplier: {type:mongoose.Schema.Types.ObjectId, ref: "User" },
   name: { type: String, required: true },
   description: { type: String, required: true },
+  bp: { type: Number, required: true },
   price: { type: Number, required: true },
   category: { type: String, required: true },
   brand: { type: String, required: true },
@@ -21,6 +22,7 @@ const productSchema = new mongoose.Schema({
   isFeatured: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
+  approved: { type: Boolean, default: true}
 });
 
 const Product = mongoose.model('Product', productSchema);

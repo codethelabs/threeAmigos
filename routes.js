@@ -2,11 +2,13 @@ const express = require('express');
 const router = express.Router();
 const Product = require('./models/product');
 const User = require('./models/users');
+const Cart = require('./models/cart');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const multer = require('multer');
 const { BlobServiceClient, StorageSharedKeyCredential } = require("@azure/storage-blob");
 const fs = require('fs');
+const Transaction = require('./models/transactions');
 
 const azure_storage_account = "3acsimagestorage"
 const azure_storage_account_key = "IgeI3y8i8SdWvjW1zUpbkwU3W7tfaTmSSDRfCeji01gmeIm8+Th9jL74RZ4kI/m+wJ0Lh/iFmXJI+ASt1QoVHQ==";
@@ -91,11 +93,13 @@ router.post('/addProduct', upload.single('productpic'), async (req, res) => {
 
     // Delete the local image file
     fs.unlinkSync(imagePath);
+    const sp = req.body.price*1.1;
 
     const newProduct = new Product({
       name: req.body.productname,
       description: req.body.description,
-      price: req.body.price,
+      bp: req.body.price,
+      price: sp,
       category: req.body.category,
       brand: req.body.brand,
       stockQuantity: req.body.quantity,
@@ -117,13 +121,34 @@ router.post('/addProduct', upload.single('productpic'), async (req, res) => {
     res.status(201).json({ success: false, message: "Server Error" });
   }
 });
+router.post('/addTransaction', async (req, res) => {
+  try {
+    const { amount, date, userId, description } = req.body;
+
+    // Create a new transaction instance
+    const newTransaction = new Transaction({
+      amount,
+      date,
+      userId,
+      description,
+    });
+
+    // Save the transaction to the database
+    const savedTransaction = await newTransaction.save();
+
+    res.status(201).json({ success: true, message: 'Transaction added successfully', data: savedTransaction });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+});
 
 
 // get all the products
 router.get('/getAllProducts', async (req, res) => {
   try {
     // Get all products
-    const allProducts = await Product.find();
+    const allProducts = await Product.find({approved: true});
 
     // Create an array to store unique product identifiers (e.g., name and brand)
     const uniqueIdentifiers = [];
@@ -143,11 +168,6 @@ router.get('/getAllProducts', async (req, res) => {
     res.status(500).json({ success: false, message: e });
   }
 });
-
-
-
-
-
 
   // Route to add a new user
 router.post('/addUser', async (req, res) => {
@@ -201,6 +221,102 @@ router.post('/addUser', async (req, res) => {
     }
     
   })
+  router.post('/addToCart', async (req, res) => {
+    try {
+      const { userId, productId, quantity } = req.body;
+  
+      // Find the user's cart
+      let cart = await Cart.findOne({ userId });
+  
+      // If the user doesn't have a cart, create a new one
+      if (!cart) {
+        cart = new Cart({
+          userId,
+        });
+      }
+  
+      // Find the product details
+      const product = await Product.findById(productId);
+  
+      // If the product doesn't exist, return an error
+      if (!product) {
+        return res.status(404).json({ success: false, message: 'Product not found' });
+      }
+  
+      // Check if the product is already in the cart
+      const existingProduct = cart.products.find((item) => item.productId.toString() === productId);
+  
+      if (existingProduct) {
+       // If the product is already in the cart, increment the quantity and update the total amount
+        await Cart.updateOne(
+          { userId:userId, 'products.productId': productId },
+          {
+            $inc: {
+              'products.$.quantity': quantity,
+              'products.$.price': quantity * product.price,
+            },
+            $set: {
+              totalAmount: cart.totalAmount + quantity * product.price,
+            },
+          }
+        );
+      } else {
+        // If the product is not in the cart, add it to the products array
+        cart.products.push({
+          productId,
+          quantity,
+          price: quantity * product.price,
+        });
+      }
+  
+      // Update the total amount in the cart
+      cart.totalAmount = cart.products.reduce((total, item) => total + item.price, 0);
+  
+      // Save the cart to the database
+      const savedCart = await cart.save();
+  
+      res.status(200).json({ success: true, message: 'Product added to cart', cart: savedCart });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ success: false, message: 'Internal Server Error' });
+    }
+  });
+  router.post('/rejectProduct', async (req, res) => {
+    try {
+      const id = req.body.id;
+  
+      // Find the product by ID
+      const product = await Product.findById(id);
+  
+      // Check if the product exists
+      if (!product) {
+        return res.status(404).json({ success: false, message: 'Product not found' });
+      }
+  
+      // Update the 'approved' field to true
+      product.approved = false;
+  
+      // Save the updated product
+      const updatedProduct = await product.save();
+  
+      res.status(200).json({ success: true, message: 'Operation completed successfully', data: updatedProduct });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ success: false, message: 'Internal Server Error' });
+    }
+  });
+
+  router.get('/deleteUserAccount/:id', async(req, res)=>{    
+    try{
+      const id = req.params.id
+      const deleteAccount = await User.deleteOne({_id:id})
+
+      res.status(200).json({success:true, message: "Operation Successful"})
+
+    }catch(e){
+      res.status(500).json({success:false, message: "Server error"})
+    }
+  })
 
   router.post('/addFunds', async (req, res) => {
     try {
@@ -221,11 +337,18 @@ router.post('/addUser', async (req, res) => {
         // If the user doesn't have a balance, create a new field
         user.balance = parseFloat(amount);
       }
-  
+      // save the transaction
+      const newTransaction = new Transaction({
+        amount: amount,
+        userId: userid,
+        description: "Added Funds"
+      })
+      
       // Save the updated user
       const updatedUser = await user.save();
+      const addTransaction = await newTransaction.save();
   
-      res.status(200).json({ success: true, message: 'Funds added successfully', data: updatedUser });
+      res.status(200).json({ success: true, message: 'Funds added successfully', data: updatedUser, transaction: addTransaction });
     } catch (error) {
       console.error(error);
       res.status(500).json({ success: false, message: 'Internal Server Error' });
@@ -247,6 +370,117 @@ router.post('/addUser', async (req, res) => {
     }
     
   })
+  // Route to delete an item from the cart
+  router.delete('/deleteFromCart/:cartId/:productId', async (req, res) => {
+    try {
+      const { cartId, productId } = req.params;
+
+      // Find the cart by ID
+      const cart = await Cart.findById(cartId);
+
+      // If the cart doesn't exist, return an error
+      if (!cart) {
+        return res.status(404).json({ success: false, message: 'Cart not found' });
+      }
+
+      // Remove the product from the products array
+      cart.products = cart.products.filter((item) => item._id.toString() !== productId);
+
+      // Update the total amount in the cart
+      cart.totalAmount = cart.products.reduce((total, item) => total + item.price, 0);
+
+      // Save the updated cart to the database
+      const updatedCart = await cart.save();
+
+      res.status(200).json({ success: true, message: 'Product removed from cart', cart: updatedCart });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ success: false, message: 'Internal Server Error' });
+    }
+  });
+  // Route to update product quantity by 1
+  router.put('/incrementQuantity/:cartId/:productId', async (req, res) => {
+    try {
+      const { cartId, productId } = req.params;
+
+      // Find the cart by ID
+      const cart = await Cart.findById(cartId);
+
+      // If the cart doesn't exist, return an error
+      if (!cart) {
+        return res.status(404).json({ success: false, message: 'Cart not found' });
+      }
+
+      // Find the product in the products array
+      const product = cart.products.find((item) => item._id.toString() === productId);
+
+      // If the product doesn't exist, return an error
+      if (!product) {
+        return res.status(404).json({ success: false, message: 'Product not found in cart' });
+      }
+
+      // Update the quantity and price of the product by 1
+      product.quantity += 1;
+      product.price += product.price;
+
+      // Update the total amount in the cart
+      cart.totalAmount = cart.products.reduce((total, item) => total + item.price, 0);
+
+      // Save the updated cart to the database
+      const updatedCart = await cart.save();
+
+      res.status(200).json({ success: true, message: 'Product quantity incremented', cart: updatedCart });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ success: false, message: 'Internal Server Error' });
+    }
+  });
+
+  // Route to decrease product quantity by 1
+  router.put('/decrementQuantity/:cartId/:productId', async (req, res) => {
+    try {
+      const { cartId, productId } = req.params;
+
+      // Find the cart by ID
+      const cart = await Cart.findById(cartId);
+
+      // If the cart doesn't exist, return an error
+      if (!cart) {
+        return res.status(404).json({ success: false, message: 'Cart not found' });
+      }
+
+      // Find the product in the products array
+      const product = cart.products.find((item) => item._id.toString() === productId);
+
+      // If the product doesn't exist, return an error
+      if (!product) {
+        return res.status(404).json({ success: false, message: 'Product not found in cart' });
+      }
+
+      // Decrease the quantity and price of the product by 1
+      if (product.quantity > 1) {
+        product.quantity -= 1;
+        product.price -= product.price;
+      } else {
+        // If the quantity is already 1, remove the product from the cart
+        cart.products = cart.products.filter((item) => item._id.toString() !== productId);
+      }
+
+      // Update the total amount in the cart
+      cart.totalAmount = cart.products.reduce((total, item) => total + item.price, 0);
+
+      // Save the updated cart to the database
+      const updatedCart = await cart.save();
+
+      res.status(200).json({ success: true, message: 'Product quantity decremented', cart: updatedCart });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ success: false, message: 'Internal Server Error' });
+    }
+  });
+
+
+  
 
 
 
