@@ -169,20 +169,38 @@ router.get('/getAllProducts', async (req, res) => {
   }
 });
 // get cart items
-router.get('/getUserCartItems/:id', async(req, res)=>{
-  try{
-    const id = req.params.id;
-    const items = await Cart.find({userId: id});
-    if(!items){
-      return res.status(200).json({success: false, message: "No Items in Cart"})
+router.get('/getUserCartItems/:id', async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    const cart = await Cart.findOne({ userId }).populate({
+      path: 'products.productId',
+      select: 'name images', // Include 'images' in the select to fetch from the Product model
+    });
+
+    if (!cart || !cart.products) {
+      return res.status(200).json({ success: false, message: 'No Items in Cart' });
     }
 
-    res.status(200).json({success:true, data: items})
+    const cartItems = cart.products.map(item => ({
+      productId: item.productId._id,
+      quantity: item.quantity,
+      price: item.price,
+      name: item.productId.name,
+      image: item.productId.images[0], // Adjust this line based on your actual structure
+    }));
 
-  }catch(e){
-    res.status(500).json({success:false, message: "Server Error"})
+    const response = {
+      totalAmount: cart.totalAmount,
+      cartItems: cartItems,
+    };
+
+    res.status(200).json({ success: true, data: response });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false, message: 'Server Error' });
   }
-})
+});
 // get all the transactions
 router.get('/getUserTransactions/:id', async(req, res)=>{
     try{
@@ -200,13 +218,13 @@ router.get('/getUserTransactions/:id', async(req, res)=>{
     }
 })
 // update user details
-router.put('/updateUser/:id', async (req, res) => {
+router.put('/updateUser', async (req, res) => {
   try {
-    const userId = req.params.id;
-    const { firstname, lastname, address, phone } = req.body;
+    // const userId = req.body.id;
+    const {id, firstname, lastname, address, phone } = req.body;
 
     // Find the user by ID
-    const user = await User.findById(userId);
+    const user = await User.findById(id);
 
     // If the user doesn't exist, return an error
     if (!user) {
