@@ -9,6 +9,7 @@ const multer = require('multer');
 const { BlobServiceClient, StorageSharedKeyCredential } = require("@azure/storage-blob");
 const fs = require('fs');
 const Transaction = require('./models/transactions');
+const SystemBalance = require('./models/sysBalances')
 
 const azure_storage_account = "3acsimagestorage"
 const azure_storage_account_key = "IgeI3y8i8SdWvjW1zUpbkwU3W7tfaTmSSDRfCeji01gmeIm8+Th9jL74RZ4kI/m+wJ0Lh/iFmXJI+ASt1QoVHQ==";
@@ -173,7 +174,7 @@ router.get('/getUserCartItems/:id', async (req, res) => {
   try {
     const userId = req.params.id;
 
-    const cart = await Cart.findOne({ userId }).populate({
+    const cart = await Cart.findOne({ userId: userId, status: "Pending" }).populate({
       path: 'products.productId',
       select: 'name images', // Include 'images' in the select to fetch from the Product model
     });
@@ -193,6 +194,7 @@ router.get('/getUserCartItems/:id', async (req, res) => {
     const response = {
       totalAmount: cart.totalAmount,
       cartItems: cartItems,
+      id: cart._id
     };
 
     res.status(200).json({ success: true, data: response });
@@ -241,6 +243,81 @@ router.put('/updateUser', async (req, res) => {
     const updatedUser = await user.save();
 
     res.status(200).json({ success: true, message: 'User details updated', data: updatedUser });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
+});
+// check out
+router.get('/checkout/:cartId', async (req, res) => {
+  try {
+    const cartId = req.params.cartId;
+
+    // Step 1: Get the cart by cartid
+    const cart = await Cart.findById(cartId);
+
+    if (!cart) {
+      return res.status(404).json({ success: false, message: 'Cart not found' });
+    }
+    
+
+    // Step 2: Update suppliers' balances with bp of the products
+    for (const cartProduct of cart.products) {
+      // Get the product details from the Product model
+      const product = await Product.findById(cartProduct.productId);
+
+      if (product) {
+        // Get the supplier details from the User model
+        const supplier = await User.findById(product.supplier);
+
+        if (supplier) {
+          // Increase the supplier's balance with the bp of the product
+          supplier.balance += (product.price*0.91*cartProduct.quantity); // Adjust based on your actual bp property
+          await supplier.save();
+          // increment system balance
+          
+            await SystemBalance.updateOne(  
+              {_id:"659afc0e4acb5e3bed729e3f"},        
+              {
+                $inc: {
+                  totalAmount: (product.price*cartProduct.quantity*0.09),
+                },
+                $set: {
+                  date: Date.now()
+                }
+                
+              }
+            );
+
+          
+          
+        }
+      }
+    }
+
+    // Step 3: Mark the cart status as processing
+    cart.status = 'Processing';
+    await cart.save();
+    // register the transaction
+    const newTransaction = new Transaction({
+      amount: cart.totalAmount,
+      userId: cart.userId,
+      description: "Purchase of Goods"
+    })
+
+    await newTransaction.save();   
+    // update user Balance
+    await User.updateOne(
+      {_id: cart.userId},
+      {
+        $inc:{
+          balance: -cart.totalAmount
+
+        }
+      })
+
+    // Step 4: Give a response
+    res.status(200).json({ success: true, message: 'Checkout successfully' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'Internal Server Error' });
@@ -305,12 +382,12 @@ router.post('/addUser', async (req, res) => {
       const { userId, productId, quantity } = req.body;
   
       // Find the user's cart
-      let cart = await Cart.findOne({ userId });
+      let cart = await Cart.findOne({ userId:userId, status:"Pending" });
   
       // If the user doesn't have a cart, create a new one
       if (!cart) {
         cart = new Cart({
-          userId,
+          userId, status:"Pending"
         });
       }
   
