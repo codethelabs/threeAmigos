@@ -9,7 +9,10 @@ const multer = require('multer');
 const { BlobServiceClient, StorageSharedKeyCredential } = require("@azure/storage-blob");
 const fs = require('fs');
 const Transaction = require('./models/transactions');
-const SystemBalance = require('./models/sysBalances')
+const SystemBalance = require('./models/sysBalances');
+const MasterService = require('./services/productServices');
+const masterService = new MasterService();
+
 
 const azure_storage_account = "3acsimagestorage"
 const azure_storage_account_key = "IgeI3y8i8SdWvjW1zUpbkwU3W7tfaTmSSDRfCeji01gmeIm8+Th9jL74RZ4kI/m+wJ0Lh/iFmXJI+ASt1QoVHQ==";
@@ -143,6 +146,20 @@ router.post('/addTransaction', async (req, res) => {
     res.status(500).json({ success: false, message: 'Internal Server Error' });
   }
 });
+// get user orders
+router.get('/getUserOrders/:id', async(req, res)=>{
+  try{
+    const orders = await Cart.find({userId: req.params.id, status: "Processing" || "Dispatched" || "Completed"});
+    if(!orders){
+      return res.status(200).json({success:false, message: "No Orders Yet"})
+    }
+
+    res.status(200).json({success:true, data: orders})
+
+  }catch(e){
+    res.status(500).json({success:false, message: "Server error."})
+  }
+})
 
 
 // get all the products
@@ -251,20 +268,23 @@ router.put('/updateUser', async (req, res) => {
 // check out
 router.get('/checkout/:cartId', async (req, res) => {
   try {
-    const cartId = req.params.cartId;
+    const cartId = req.params.cartId;    
 
     // Step 1: Get the cart by cartid
     const cart = await Cart.findById(cartId);
 
     if (!cart) {
       return res.status(404).json({ success: false, message: 'Cart not found' });
-    }
+    }  
+    // get the user details
+    const buyer = await User.findOne({_id:cart.userId})
     
 
     // Step 2: Update suppliers' balances with bp of the products
     for (const cartProduct of cart.products) {
       // Get the product details from the Product model
       const product = await Product.findById(cartProduct.productId);
+
 
       if (product) {
         // Get the supplier details from the User model
@@ -293,6 +313,16 @@ router.get('/checkout/:cartId', async (req, res) => {
           
         }
       }
+      // update the quantity
+      await Product.updateOne(
+        {_id: cartProduct.productId},
+        {
+          $inc: {
+            stockQuantity: -cartProduct.quantity
+          }
+        }
+      )
+
     }
 
     // Step 3: Mark the cart status as processing
@@ -307,7 +337,7 @@ router.get('/checkout/:cartId', async (req, res) => {
 
     await newTransaction.save();   
     // update user Balance
-    await User.updateOne(
+     await User.updateOne(
       {_id: cart.userId},
       {
         $inc:{
@@ -315,6 +345,9 @@ router.get('/checkout/:cartId', async (req, res) => {
 
         }
       })
+      await masterService.sendEmail(buyer.email, `Order Status`, `Order status for Order::${cartId} now marked as: Processing`, "Three Amigos Corp")
+
+      await masterService.sendEmail(buyer.email, `${cart.userId} Checkout`, `Payment of £${cart.totalAmount} Successful. Thank you for shopping with us. Adios.`, "Three Amigos Corp Checkout")
 
     // Step 4: Give a response
     res.status(200).json({ success: true, message: 'Checkout successfully' });
@@ -377,6 +410,24 @@ router.post('/addUser', async (req, res) => {
     }
     
   })
+
+  // send email
+  router.post('/sendEmail', async (req, res) => {
+    const to = 'cosmopolink@gmail.com';
+    const subject = 'ORDER XX865X';
+    const text = 'Just saying hello';
+    const title = "Order Status"
+    const link = "https://3acs-webapp-2.azurewebsites.net/dashboard/market"
+  
+    try {
+      const result = await masterService.sendEmail(to, subject, text,title, link);
+      res.status(200).json(result);
+    } catch (error) {
+      res.status(500).send(error);
+    }
+});
+
+  // add to cart
   router.post('/addToCart', async (req, res) => {
     try {
       const { userId, productId, quantity } = req.body;
@@ -417,6 +468,9 @@ router.post('/addUser', async (req, res) => {
           }
         );
       } else {
+      const user = await User.findOne({_id: userId});
+
+        await masterService.sendEmail(user.email, `New Order Created`, `Creation of new order Successful. Thank you for shopping with us. Adios.`, "Three Amigos Corp")
         // If the product is not in the cart, add it to the products array
         cart.products.push({
           productId,
@@ -430,6 +484,7 @@ router.post('/addUser', async (req, res) => {
   
       // Save the cart to the database
       const savedCart = await cart.save();
+      
   
       res.status(200).json({ success: true, message: 'Product added to cart', cart: savedCart });
     } catch (error) {
@@ -503,6 +558,7 @@ router.post('/addUser', async (req, res) => {
       // Save the updated user
       const updatedUser = await user.save();
       const addTransaction = await newTransaction.save();
+      await masterService.sendEmail(user.email, `Wallet topup`, `Top up of £${amount} Successful. Thank you for your continued trust in us. Adios.`, "Three Amigos Corp")
   
       res.status(200).json({ success: true, message: 'Funds added successfully', data: updatedUser, transaction: addTransaction });
     } catch (error) {
