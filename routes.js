@@ -52,7 +52,8 @@ router.get('/markOrderDispatched/:id', async (req, res)=>{
         {_id:req.params.id},
         {
           $set: {
-            status: "Dispatched"
+            status: "Dispatched",
+            date: Date.now()
           }
         }
         )
@@ -77,7 +78,8 @@ router.get('/markOrderCompleted/:id', async (req, res)=>{
         {_id:req.params.id},
         {
           $set: {
-            status: "Completed"
+            status: "Completed",
+            date: Date.now()
           }
         }
         )
