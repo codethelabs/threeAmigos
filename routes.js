@@ -43,6 +43,56 @@ const upload = multer({ storage });
 router.get('/', (req, res) => {
     res.send('Welcome to the home page');
 });
+// mark order dispatched
+router.get('/markOrderDispatched/:id', async (req, res)=>{
+  try{
+    const cart = await Cart.findOne({_id:req.params.id});
+    if(cart){
+      const cart = await Cart.updateOne(
+        {_id:req.params.id},
+        {
+          $set: {
+            status: "Dispatched"
+          }
+        }
+        )
+
+    }
+    const user = await User.findOne({_id: cart.userId})
+
+      await masterService.sendEmail(user.email, `Order Status (${req.params.id})`, "This Order has now been marked: <strong>Dispatched</strong>", "Three Amigos Corp")
+
+      res.status(200).json({success:true, message: "Order updated successfully"})
+
+  }catch(e){
+    res.status(500).send({success:false, message: "Server error"})
+  }
+})
+// mark order complete
+router.get('/markOrderCompleted/:id', async (req, res)=>{
+  try{
+    const cart = await Cart.findOne({_id:req.params.id});
+    if(cart){
+      const cart = await Cart.updateOne(
+        {_id:req.params.id},
+        {
+          $set: {
+            status: "Completed"
+          }
+        }
+        )
+
+    }
+    const user = await User.findOne({_id: cart.userId})
+
+      await masterService.sendEmail(user.email, `Order Status (${req.params.id})`, "This Order has now been marked: <strong>Completed</strong>", "Three Amigos Corp")
+
+      res.status(200).json({success:true, message: "Order updated successfully"})
+
+  }catch(e){
+    res.status(500).send({success:false, message: "Server error"})
+  }
+})
 // POST route for user login
 router.post('/login', async (req, res) => {
     try {
@@ -71,6 +121,59 @@ router.post('/login', async (req, res) => {
       console.error(error);
       res.status(500).json({ success: false, message: 'Internal Server Error' });
     }
+});
+// Order view for management
+router.get('/getCartItems', async (req, res) => {
+  try {
+    const statusArray = ['Processing', 'Dispatched', 'Completed'];
+
+    // Find carts with the specified status
+    const carts = await Cart.find({ status: { $in: statusArray } }).sort({ date: -1 });;
+
+    if (!carts || carts.length === 0) {
+      return res.status(404).json({ success: false, message: 'No carts found' });
+    }
+
+    // Fetch product details for each item in all carts and group by cartId
+    const groupedCartItems = {};
+
+    for (const cart of carts) {
+      const cartStatus = cart.status;
+      const createdAt = cart.date;
+
+      for (const cartItem of cart.products) {
+        const product = await Product.findById(cartItem.productId);
+
+        if (product) {
+          if (!groupedCartItems[cart._id]) {
+            groupedCartItems[cart._id] = {
+              status: cartStatus,              
+              date: createdAt,
+              products: [],
+            };
+          }
+
+          groupedCartItems[cart._id].products.push({
+            cartId: cart._id,
+            productId: cartItem.productId,
+            quantity: cartItem.quantity,
+            price: Math.round(cartItem.price,2),
+            productName: product.name,
+            image: product.images[0],
+            productDescription: product.description,
+            // Add other product details you want to include
+          });
+        } else {
+          // Handle the case when product is not found
+        }
+      }
+    }
+
+    res.status(200).json({ success: true, data: groupedCartItems });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Internal Server Error' });
+  }
 });
 // add a product
 router.post('/addProduct', upload.single('productpic'), async (req, res) => {
