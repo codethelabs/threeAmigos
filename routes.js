@@ -118,7 +118,9 @@ router.post('/addProduct', upload.single('productpic'), async (req, res) => {
       ...savedProduct._doc,
       images: [`${sasToken}`],
     };
-
+    const user = await User.findOne({_id: req.body.supplier})
+    await masterService.sendEmail(user.email, `New Producted Added`, `Hello ${user.firstname} ${user.lastname}, Your Product has successfully been added. Adios.`, "Three Amigos Corp")
+    
     res.status(200).json({ success: true, message: "Product added successfully", data: productWithSas });
   } catch (error) {
     console.error(error);
