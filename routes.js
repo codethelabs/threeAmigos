@@ -256,7 +256,8 @@ router.post('/addTransaction', async (req, res) => {
 // get user orders
 router.get('/getUserOrders/:id', async(req, res)=>{
   try{
-    const orders = await Cart.find({userId: req.params.id, status: "Processing" || "Dispatched" || "Completed"});
+    const statusArray = ['Pending','Processing', 'Dispatched', 'Completed'];
+    const orders = await Cart.find({userId: req.params.id, status: {$in: statusArray}});
     if(!orders){
       return res.status(200).json({success:false, message: "No Orders Yet"})
     }
@@ -399,9 +400,18 @@ router.get('/checkout/:cartId', async (req, res) => {
 
         if (supplier) {
           // Increase the supplier's balance with the bp of the product
-          supplier.balance += (product.price*0.91*cartProduct.quantity); // Adjust based on your actual bp property
+          supplier.balance += (product.price*0.90*cartProduct.quantity); // Adjust based on your actual bp property
           await supplier.save();
           // increment system balance
+          await masterService.sendEmail(supplier.email, "Payment for Goods", `Payment of £${product.price*0.91*cartProduct.quantity} for ${product.name} (${cartProduct.quantity}) Successful. Pleasure doing business with you. Adios.`, "Three Amigos Corp");
+          const newt = new Transaction({
+            amount: product.price*0.91*cartProduct.quantity,
+            userId: supplier._id,
+            description: "Payment for Goods Supplied",
+            date: Date.now()
+          })
+
+          await newt.save();
           
             await SystemBalance.updateOne(  
               {_id:"659afc0e4acb5e3bed729e3f"},        
