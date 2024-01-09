@@ -268,6 +268,17 @@ router.get('/getUserOrders/:id', async(req, res)=>{
     res.status(500).json({success:false, message: "Server error."})
   }
 })
+router.get('/getAllUsers', async (req, res)=>{
+  try{
+  
+    const users = await User.find()
+    res.status(200).json({success:true, data: users})
+
+  }catch(e){
+    res.status(500).json({success:false, message: e})
+  }
+
+})
 
 
 // get all the products
